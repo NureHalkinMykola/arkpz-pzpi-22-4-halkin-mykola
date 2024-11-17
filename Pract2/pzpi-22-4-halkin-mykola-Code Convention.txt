@@ -1,0 +1,243 @@
+
+МІНІСТЕРСТВО ОСВІТИ ТА НАУКИ УКРАЇНИ
+
+ХАРКІВСЬКИЙ НАЦІОНАЛЬНИЙ УНІВЕРСИТЕТ РАДІОЕЛЕКТРОНІКИ
+
+
+Кафедра «Програмної інженерії»
+
+
+ЗВІТ
+з практичної роботи №2 
+з дисципліни “Аналіз та рефакторінг коду” 
+на тему “Методи рефакторингу коду програмного забезпечення”
+
+
+
+
+Виконав ст. гр. ПЗПІ-22-4
+Галкін Микола Сергійович
+
+Перевірив:
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+
+
+Харків 2024
+мета
+Ознайомитись з основним методам рефакторингу коду на основі реальних прикладів з власних програмних проектів. Навчитися ідентифікувати проблеми в коді та використовувати відповідні методи рефакторингу для покращення його якості.
+
+ЗАВДАННЯ
+    1. Необхідно обрати три методи рефакторингу коду із книги Мартіна Фаулера «Refactoring. Improving the Design of Existing Code».
+    2. Навести приклади особистого коду, який потребує покращення, та продемонструвати застосування обраних методів. 
+
+ХІД РОБОТИ
+Рефакторинг коду — це процес поліпшення існуючого коду без зміни його поведінки. Процес рефакторингу включає в себе такі етапи: 
+    1. Аналіз коду: програміст виділяє код, який потребує покращення.
+    2. Переписування коду: внесення змін до структури коду, його покращення.
+    3. Тестування коду: тестування поліпшеного коду, все повинно працювати коректно.
+Розглянемо три методи рефакторингу: Move Field, Move Method, Add Parameter.
+
+1. Move Field.
+Метод включає в себе переміщення поля з одного класу до іншого. Це необхідно робити коли поле більше використовується в іншому класі та більше до нього підходить логічно. Це покращує модульність коду.
+Приклад до рефакторингу: 
+class PlayerPerformance {
+    constructor() {
+        this.lives = 5
+        this.gamesPlayed = 0
+    }
+
+    scoreCalc() {
+        return this.lives * this.gamesPlayed
+    }
+}
+
+class Player {
+    constructor(name) {
+        this.name = name
+        this.score = 0
+        this.performance = new PlayerPerformance
+    }
+
+    updateScore() {
+        this.score = this.performance.scoreCalc()
+    }
+}
+
+Приклад після рефакторингу:
+class PlayerPerformance {
+    constructor() {
+        this.lives = 5
+        this.gamesPlayed = 0
+        this.score = 0
+    }
+
+    scoreCalc() {
+        this.score = this.lives * this.gamesPlayed
+    }
+}
+
+class Player {
+    constructor(name) {
+        this.name = name
+        this.performance = new PlayerPerformance
+    }
+}
+
+В даному прикладі поле score було перенесено в клас PlayerPerformance, оскільки воно логічно більш підходить до нього та використовується в ньому. Тепер достатньо мати один метод, який розраховує та оновлює score замість двох. Це покращує модульність коду, його читабельність. 
+
+2. Move Method
+Метод включає в себе переміщення методу з одного класу до іншого. Це необхідно коли метод використовує більше даних з іншого класу, таким чином покращується модульність коду.
+Приклад до рефакторингу: 
+class Customer {
+    constructor(name, membershipLevel) {
+        this.name = name
+        this.membershipLevel = membershipLevel
+        this.purchaseAmount = 0
+    }
+}
+
+class Order {
+    constructor(customer, price, items) {
+        this.customer = customer
+        this.items = items
+        this.price = price
+    }
+
+    calculateDiscount() {
+        if (this.customer.purchaseAmount > 1000) {
+            switch (this.customer.membershipLevel) {
+                case 1: return 0.8
+                case 2: return 0.7
+                default: return 0.9
+            }
+        } else {
+            switch (this.customer.membershipLevel) {
+                case 1: return 0.9
+                case 2: return 0.8
+                default: return 1
+            }
+        }
+    }
+
+    getTotalPrice() {
+        return this.price * this.calculateDiscount()
+    }
+}
+
+Приклад після рефакторингу:
+class Customer {
+    constructor(name, membershipLevel) {
+        this.name = name
+        this.membershipLevel = membershipLevel
+        this.purchaseAmount = 0
+    }
+
+    calculateDiscount() {
+        if (this.purchaseAmount > 1000) {
+            switch (this.membershipLevel) {
+                case 1: return 0.8
+                case 2: return 0.7
+                default: return 0.9
+            }
+        } else {
+            switch (this.membershipLevel) {
+                case 1: return 0.9
+                case 2: return 0.8
+                default: return 1
+            }
+        }
+    }
+}
+
+class Order {
+    constructor(customer, price, items) {
+        this.customer = customer
+        this.items = items
+        this.price = price
+    }
+
+    getTotalPrice() {
+        return this.price * this.customer.calculateDiscount()
+    }
+}
+
+В даному прикладі метод calculateDiscount був перенесений у клас Customer оскільки він використовує поля саме з цього класу. Таким чином, логіка знаходження знижки знаходиться саме в класі, який потрібен для її знаходження. Це покращує модульність та читабельність коду. 
+
+3. Add Parameter
+Метод включає в себе додавання нового параметру у методі замість поля у класі. Це необхідно коли треба додати новий додатковий функціонал до існуючого методу з мінімальною кількістю змін.
+
+Приклад до рефакторингу: 
+class Customer {
+    constructor(name, membershipLevel) {
+        this.name = name
+        this.membershipLevel = membershipLevel
+        this.purchaseAmount = 0
+    }
+
+    calculateDiscount() {
+        if (this.purchaseAmount > 1000) {
+            switch (this.membershipLevel) {
+                case 1: return 0.8
+                case 2: return 0.7
+                default: return 0.9
+            }
+        } else {
+            switch (this.membershipLevel) {
+                case 1: return 0.9
+                case 2: return 0.8
+                default: return 1
+            }
+        }
+    }
+}
+
+Приклад після рефакторингу:
+class Customer {
+    constructor(name, membershipLevel) {
+        this.name = name
+        this.membershipLevel = membershipLevel
+        this.purchaseAmount = 0
+    }
+
+    calculateDiscount(promo = 1) {
+        if (this.purchaseAmount > 1000) {
+            switch (this.membershipLevel) {
+                case 1: return (0.8 * promo)
+                case 2: return (0.7 * promo)
+                default: return (0.9 * promo)
+            }
+        } else {
+            switch (this.membershipLevel) {
+                case 1: return (0.9 * promo)
+                case 2: return (0.8 * promo)
+                default: return (1 * promo)
+            }
+        }
+    }
+}
+
+В даному прикладі у методі було додано параметр promo, який додає новий необхідний функціонал у цьому методі. Зроблено це таким чином, що вже існуючі використання цього методу продовжать працювати без змін, оскільки цей параметр приймає стандартне значення. 
+
+Інструменти рефакторингу.
+Усі сучасні IDE автоматично рефакторят написаний код, кількома способами. Наприклад при збереженні змін у файлі багато які IDE (наприклад: visual studio code) автоматично розставляють необхідні табуляції та пробіли, виправляють помилки. Також усі сучасні IDE помічають у коді можливі недоліки рефакторингу (наприклад: зайві функції, поля), але саме програміст відповідає за їх виправлення. Також сучасні IDE надають можливості швидкого рефакторингу великої кількості коду (наприклад: зміна назви функції чи поля у всьому коді; виділення коду в новий метод).
+Сучасні IDE включають в себе: visual studio code, visual studio, IntelliJ IDEA, Eclipse. Усі вони надають базові методи рефакторингу та пропонують як саме їх використовувати. 
+
+Висновки
+
+Після проведення практичної роботи я побачив на практичних прикладах наскільки важливий рефакторинг коду. Він дозволяє значно покращити читабельність коду, пришвидшити працю з цим кодом та облегшити працю з цим кодом у майбутньому. Хоч і сам процес рефакторингу потребує деяку кількість часу, у результаті ми збережемо більше часу у майбутньому. Таким чином вміння вірно рефакторити код дуже важлива навичка для кожного програміста. 
+
+Відеозвіт - https://www.youtube.com/watch?v=o-VS_J1XEsw 
+
+ДОДАТОК А
+ПЕРЕЛІК ДЖЕРЕЛ 
+
+    1. Fowler, M.  Refactoring: Improving the Design of Existing Code: Addison-Wesley, 1999, 464 с.
+
+ДОДАТОК Б
+Презентація
