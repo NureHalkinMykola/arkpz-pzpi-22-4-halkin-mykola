@@ -23,6 +23,10 @@ const Waiter = db.sequelize.define('Waiter', {
         type: DataTypes.STRING(255),
         allowNull: false
     },
+    password: {
+        type: DataTypes.STRING(255),
+        allowNull: false
+    },
     sex: {
         type: DataTypes.STRING(6),
         allowNull: false
