@@ -1,0 +1,802 @@
+
+МІНІСТЕРСТВО ОСВІТИ ТА НАУКИ УКРАЇНИ
+
+ХАРКІВСЬКИЙ НАЦІОНАЛЬНИЙ УНІВЕРСИТЕТ РАДІОЕЛЕКТРОНІКИ
+
+
+Кафедра «Програмної інженерії»
+
+
+ЗВІТ
+з лабораторної роботи №2 
+з дисципліни “Аналіз та рефакторінг коду” 
+на тему “Розробка бази даних для серверної частини програмної системи та прикладного програмного інтерфейсу (api)”
+
+
+
+
+Виконав ст. гр. ПЗПІ-22-4
+Галкін Микола Сергійович
+
+Перевірив:
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+Харків 2024
+Мета
+Потрібно розробити базу даних для серверної частини програмної системи та прикладного програмного інтерфейсу.
+
+Хід роботи
+
+Спочатку в лабораторній роботі була створена UML діаграма прецедентів для серверної частини системи  (Додаток А).
+Далі була створена ER діаграма даних (Додаток Б). На базі ER діаграми була створена діаграма структури бази даних (Додаток В). 
+Далі розроблен API для взаємодії серверної частини та клієнта (Додаток Г) та специфікація OpenAPI (Додаток Д). 
+Під час розробки API були прийняті наступні інженерні рішення: 
+    1. Взаємодія між частинами застосунку встановлена завдяки HTTP-запитам (RESTful API). Серверна частина (API) обробляє ці запити та забезпечує взаємодію з базою даних. 
+    2. Серверна частина була написана на мові javascript, з використанням фреймворку node.js, бібліотеки express. Завдяки цім технологіям був створений сервер.
+    3. Для взаємодії з базою даних використовується ORM бібліотека Sequelize. Завдяки цій технології встановлена взаємодія з базою даних. 
+    4. Було використане СУБД - SQL Server. Завдяки цій технології реалізована база даних.
+
+Висновки
+
+В ході лабораторної роботи були створені необхідні діаграми. На основі цих діаграм було створено базу даних. Була розроблена серверна частина застосунку. Була створена специфікація API. 
+Відеозвіт - https://youtu.be/ODZZXQ0bfzc 
+ДОДАТОК А
+UML діаграма прецедентів для серверної частини системи 
+
+ДОДАТОК Б
+ER діаграма даних 
+
+
+ДОДАТОК В
+Діаграма структури бази даних 
+
+ДОДАТОК Г
+Приклади коду
+
+Приклад підключення до бази даних
+    1 	const { Sequelize } = require('sequelize');
+    2 	require('dotenv').config();
+    3 	
+    4 	const sequelize = new Sequelize(
+    5 	    process.env.DB_NAME,
+    6 	    process.env.DB_USER,
+    7 	    process.env.DB_PASSWORD, {
+    8 	        host: process.env.DB_HOST,
+    9 	        port: process.env.DB_PORT || 1434,
+    10 	        dialect: 'mssql',
+    11 	        dialectOptions: {
+    12 	            encrypt: true,
+    13 	            trustServerCertificate: true,
+    14 	        },
+    15 	    }
+    16 	);
+    17 	
+    18 	const db = {};
+    19 	db.Sequlize = Sequelize;
+    20 	db.sequelize = sequelize;
+    21 	
+    22 	module.exports = db;
+
+Приклад взаємодії з клієнтом (запити про страви)
+    1 	const Dish = require('../models/Relations').Dish;
+    2 	
+    3 	const create = async (req, res) => {
+    4 	    //Auth
+    5 	
+    6 	    try {
+    7 	        const {restaurantId, name, description, price} = req.body;
+    8 	        const dish = await Dish.create({
+    9 	            restaurantId,
+    10 	            name,
+    11 	            description,
+    12 	            price
+    13 	        });
+    14 	        return res.status(201).json(dish);
+    15 	    } catch (error) {
+    16 	        return res.status(500).json({message: error.message});
+    17 	    }
+    18 	};
+    19 	
+    20 	const getAll = async (req, res) => {
+    21 	    //Auth
+    22 	
+    23 	    try {
+    24 	        const dish = await Dish.findAll();
+    25 	        return res.status(200).json(dish);
+    26 	    } catch (error) {
+    27 	        return res.status(500).json({message: error.message});
+    28 	    }
+    29 	};
+    30 	
+    31 	const deleter = async (req, res) => {
+    32 	    //Auth
+    33 	
+    34 	    try {
+    35 	        const {dishId} = req.body;
+    36 	        const dish = await Dish.destroy({
+    37 	            where: { dishId: dishId },
+    38 	        });
+    39 	        return res.status(200).json(dish);
+    40 	    } catch (error) {
+    41 	        return res.status(500).json({message: error.message});
+    42 	    }
+    43 	};
+    44 	
+    45 	const edit = async (req, res) => {
+    46 	    //Auth
+    47 	
+    48 	    try {
+    49 	        const { id } = req.params;
+    50 	        const changes = req.body;
+    51 	        const [affectedRows] = await Dish.update(changes, {
+    52 	            where: { dishId:id },
+    53 	        });
+    54 	
+    55 	        if (affectedRows > 0) {
+    56 	            return res.status(200).json({ message: Dish with ID ${id} updated successfully. });
+    57 	        } else {
+    58 	            return res.status(404).json({ message: No dish found with ID ${id}. });
+    59 	        }
+    60 	    } catch (error) {
+    61 	        return res.status(500).json({message: error.message});
+    62 	    }
+    63 	};
+    64 	
+    65 	module.exports = {
+    66 	    create,
+    67 	    getAll,
+    68 	    deleter,
+    69 	    edit
+    70 	};
+
+Приклад моделі таблиці бази даних (страва)
+    1 	const { DataTypes } = require('sequelize');
+    2 	const db = require('../config/db.config.js');
+    3 	
+    4 	const Dish = db.sequelize.define('Dish', {
+    5 	    dishId: {
+    6 	        type: DataTypes.INTEGER,
+    7 	        primaryKey: true,
+    8 	        autoIncrement: true
+    9 	    },
+    10 	    restaurantId: {
+    11 	        type: DataTypes.INTEGER,
+    12 	        references: {
+    13 	            model: 'restaurant',
+    14 	            key: 'restaurantId'
+    15 	        },
+    16 	        allowNull: false,
+    17 	    },
+    18 	    name: {
+    19 	        type: DataTypes.STRING(255),
+    20 	        allowNull: false
+    21 	    },
+    22 	    description: {
+    23 	        type: DataTypes.STRING(255),
+    24 	        allowNull: false
+    25 	    },
+    26 	    price: {
+    27 	        type: DataTypes.INTEGER,
+    28 	        allowNull: false
+    29 	    },
+    30 	}, {
+    31 	    tableName: 'dish',
+    32 	    timestamps: false
+    33 	});
+    34 	
+    35 	module.exports = Dish;
+
+Приклад маршруту запитів (страва)
+    1 	const express = require('express');
+    2 	const {create, getAll, edit, deleter} = require('../controllers/dish.js');
+    3 	const router = express.Router();
+    4 	
+    5 	router.post('/create', create);
+    6 	router.get('/getAll', getAll);
+    7 	router.post('/edit/:id', edit);
+    8 	router.post('/delete', deleter);
+    9 	
+    10 	module.exports = router;
+
+ДОДАТОК Д
+Специфікація API
+
+    1 	openapi: 3.0.0	
+    2 	info:	
+    3 	  title: Restaurant Management API	
+    4 	  description: API for assistance with waiters, predictions	
+    5 	  version: 1.0.0	
+    6 		
+    7 	paths:	
+    8 	  /restaurant/create:	
+    9 	    post:	
+    10 	      summary: Create a new restaurant	
+    11 	      requestBody:	
+    12 	        required: true
+    13 	        content:	
+    14 	          application/json:	
+    15 	            schema:	
+    16 	              type: object	
+    17 	              properties:	
+    18 	                name:	
+    19 	                  type: string	
+    20 	                  example: "Pizza Hut"	
+    21 	      responses:	
+    22 	        '201':	
+    23 	          description: Restaurant created successfully	
+    24 	          content:	
+    25 	            application/json:	
+    26 	              schema:	
+    27 	                $ref: '#/components/schemas/Restaurant'	
+    28 	        '500':	
+    29 	          description: Internal server error	
+    30 	          content:	
+    31 	            application/json:	
+    32 	              schema:	
+    33 	                type: object	
+    34 	                properties:	
+    35 	                  message:	
+    36 	                    type: string	
+    37 		
+    38 	  /restaurant/delete:	
+    39 	    post:	
+    40 	      summary: Delete a restaurant by its ID	
+    41 	      requestBody:	
+    42 	        required: true	
+    43 	        content:	
+    44 	          application/json:	
+    45 	            schema:	
+    46 	              type: object	
+    47 	              properties:	
+    48 	                restaurantId:	
+    49 	                  type: integer	
+    50 	                  example: 1	
+    51 	      responses:	
+    52 	        '200':	
+    53 	          description: Restaurant deleted successfully	
+    54 	        '500':	
+    55 	          description: Internal server error	
+    56 		
+    57 	  /restaurant/getAll:	
+    58 	    get:	
+    59 	      summary: Get all restaurants	
+    60 	      responses:	
+    61 	        '200':	
+    62 	          description: A list of all restaurants	
+    63 	          content:	
+    64 	            application/json:	
+    65 	              schema:	
+    66 	                type: array	
+    67 	                items:	
+    68 	                  $ref: '#/components/schemas/Restaurant'	
+    69 	        '500':	
+    70 	          description: Internal server error	
+    71 		
+    72 		
+    73 	  /waiter/create:	
+    74 	    post:	
+    75 	      summary: Create a new waiter	
+    76 	      requestBody:	
+    77 	        required: true	
+    78 	        content:	
+    79 	          application/json:	
+    80 	            schema:	
+    81 	              type: object	
+    82 	              properties:	
+    83 	                restaurantId:	
+    84 	                  type: integer	
+    85 	                  example: 1	
+    86 	                lastName:	
+    87 	                  type: string	
+    88 	                  example: "Doe"	
+    89 	                name:	
+    90 	                  type: string	
+    91 	                  example: "John"	
+    92 	                password:	
+    93 	                  type: string	
+    94 	                  example: "password123"	
+    95 	                sex:	
+    96 	                  type: string	
+    97 	                  example: "M"	
+    98 	      responses:	
+    99 	        '201':	
+    100 	          description: Waiter created successfully	
+    101 	          content:	
+    102 	            application/json:	
+    103 	              schema:	
+    104 	                $ref: '#/components/schemas/Waiter'	
+    105 	        '500':	
+    106 	          description: Internal server error	
+    107 		
+    108 	  /waiter/getAll:	
+    109 	    get:	
+    110 	      summary: Get all waiters	
+    111 	      responses:	
+    112 	        '200':	
+    113 	          description: A list of all waiters	
+    114 	          content:	
+    115 	            application/json:	
+    116 	              schema:	
+    117 	                type: array	
+    118 	                items:	
+    119 	                  $ref: '#/components/schemas/Waiter'	
+    120 	        '500':	
+    121 	          description: Internal server error	
+    122 		
+    123 	  /waiter/getById:	
+    124 	    get:	
+    125 	      summary: Get a waiter by ID	
+    126 	      parameters:	
+    127 	        - in: query	
+    128 	          name: waiterId	
+    129 	          required: true	
+    130 	          description: The ID of the waiter to retrieve	
+    131 	          schema:	
+    132 	            type: integer	
+    133 	      responses:	
+    134 	        '200':	
+    135 	          description: Waiter found	
+    136 	          content:	
+    137 	            application/json:	
+    138 	              schema:	
+    139 	                $ref: '#/components/schemas/Waiter'	
+    140 	        '404':	
+    141 	          description: Waiter not found	
+    142 	        '500':	
+    143 	          description: Internal server error	
+    144 	/waiter/edit/{id}:	
+    145 	    post:	
+    146 	      summary: Update a waiter's information	
+    147 	      parameters:	
+    148 	        - in: path	
+    149 	          name: id	
+    150 	          required: true	
+    151 	          description: The ID of the waiter to update	
+    152 	          schema:	
+    153 	            type: integer	
+    154 	      requestBody:	
+    155 	        required: true	
+    156 	        content:	
+    157 	          application/json:	
+    158 	            schema:	
+    159 	              type: object	
+    160 	              properties:	
+    161 	                lastName:	
+    162 	                  type: string	
+    163 	                name:	
+    164 	                  type: string	
+    165 	                password:	
+    166 	                  type: string	
+    167 	                sex:	
+    168 	                  type: string	
+    169 	                  enum: ["M", "F"]	
+    170 	      responses:	
+    171 	        '200':	
+    172 	          description: Waiter updated successfully	
+    173 	        '404':	
+    174 	          description: Waiter not found	
+    175 	        '500':	
+    176 	          description: Internal server error	
+    177 		
+    178 	  /waiter/delete:	
+    179 	    post:	
+    180 	      summary: Delete a waiter by ID	
+    181 	      requestBody:	
+    182 	        required: true	
+    183 	        content:	
+    184 	          application/json:	
+    185 	            schema:	
+    186 	              type: object	
+    187 	              properties:	
+    188 	                waiterId:	
+    189 	                  type: integer	
+    190 	      responses:	
+    191 	        '200':	
+    192 	          description: Waiter deleted successfully	
+    193 	        '500':	
+    194 	          description: Internal server error	
+    195 		
+    196 		
+    197 	  /dish/create:	
+    198 	    post:	
+    199 	      summary: Create a new dish	
+    200 	      requestBody:	
+    201 	        required: true	
+    202 	        content:	
+    203 	          application/json:	
+    204 	            schema:	
+    205 	              type: object	
+    206 	              properties:	
+    207 	                restaurantId:	
+    208 	                  type: integer	
+    209 	                name:	
+    210 	                  type: string	
+    211 	                description:	
+    212 	                  type: string	
+    213 	                price:	
+    214 	                  type: number	
+    215 	                  format: float	
+    216 	      responses:	
+    217 	        '201':	
+    218 	          description: Dish created successfully	
+    219 	          content:	
+    220 	            application/json:	
+    221 	              schema:	
+    222 	                $ref: '#/components/schemas/Dish'	
+    223 	        '500':	
+    224 	          description: Internal server error	
+    225 		
+    226 	  /dish/getAll:	
+    227 	    get:	
+    228 	      summary: Get all dishes	
+    229 	      responses:	
+    230 	        '200':	
+    231 	          description: A list of all dishes	
+    232 	          content:	
+    233 	            application/json:	
+    234 	              schema:	
+    235 	                type: array	
+    236 	                items:	
+    237 	                  $ref: '#/components/schemas/Dish'	
+    238 	        '500':	
+    239 	          description: Internal server error	
+    240 		
+    241 	  /dish/delete:	
+    242 	    post:	
+    243 	      summary: Delete a dish by its ID	
+    244 	      requestBody:	
+    245 	        required: true	
+    246 	        content:	
+    247 	          application/json:	
+    248 	            schema:	
+    249 	              type: object	
+    250 	              properties:	
+    251 	                dishId:	
+    252 	                  type: integer	
+    253 	      responses:	
+    254 	        '200':	
+    255 	          description: Dish deleted successfully	
+    256 	        '500':	
+    257 	          description: Internal server error	
+    258 		
+    259 	  /dish/edit/{id}:	
+    260 	    post:	
+    261 	      summary: Update a dish's details	
+    262 	      parameters:	
+    263 	        - in: path	
+    264 	          name: id	
+    265 	          required: true	
+    266 	          description: The ID of the dish to update	
+    267 	          schema:	
+    268 	            type: integer	
+    269 	      requestBody:	
+    270 	        required: true	
+    271 	        content:	
+    272 	          application/json:	
+    273 	            schema:	
+    274 	              type: object	
+    275 	              properties:	
+    276 	                name:	
+    277 	                  type: string	
+    278 	                description:	
+    279 	                  type: string	
+    280 	                price:	
+    281 	                  type: number	
+    282 	                  format: float	
+    283 	      responses:	
+    284 	        '200':	
+    285 	          description: Dish updated successfully	
+    286 	        '404':	
+    287 	          description: Dish not found	
+    288 	        '500':	
+    289 	          description: Internal server error	
+    290 	/order/create:	
+    291 	    post:	
+    292 	      summary: Create a new order	
+    293 	      requestBody:	
+    294 	        required: true	
+    295 	        content:	
+    296 	          application/json:	
+    297 	            schema:	
+    298 	              type: object	
+    299 	              properties:	
+    300 	                waiterId:	
+    301 	                  type: integer	
+    302 	                date:	
+    303 	                  type: string	
+    304 	                  format: date	
+    305 	      responses:	
+    306 	        '201':	
+    307 	          description: Order created successfully	
+    308 	          content:	
+    309 	            application/json:	
+    310 	              schema:	
+    311 	                $ref: '#/components/schemas/Order'	
+    312 	        '500':	
+    313 	          description: Internal server error	
+    314 		
+    315 	  /order/getAll:	
+    316 	    get:	
+    317 	      summary: Get all orders	
+    318 	      responses:	
+    319 	        '200':	
+    320 	          description: A list of all orders	
+    321 	          content:	
+    322 	            application/json:	
+    323 	              schema:	
+    324 	                type: array	
+    325 	                items:	
+    326 	                  $ref: '#/components/schemas/Order'	
+    327 	        '500':	
+    328 	          description: Internal server error	
+    329 		
+    330 	  /order/edit/{id}:	
+    331 	    post:	
+    332 	      summary: Update an order's details	
+    333 	      parameters:	
+    334 	        - in: path	
+    335 	          name: id	
+    336 	          required: true	
+    337 	          description: The ID of the order to update	
+    338 	          schema:	
+    339 	            type: integer	
+    340 	      requestBody:	
+    341 	        required: true	
+    342 	        content:	
+    343 	          application/json:	
+    344 	            schema:	
+    345 	              type: object	
+    346 	      responses:	
+    347 	        '200':	
+    348 	          description: Order updated successfully	
+    349 	        '404':	
+    350 	          description: Order not found	
+    351 	        '500':	
+    352 	          description: Internal server error	
+    353 		
+    354 	  /order/delete:	
+    355 	    post:	
+    356 	      summary: Delete an order by its ID	
+    357 	      requestBody:	
+    358 	        required: true	
+    359 	        content:	
+    360 	          application/json:	
+    361 	            schema:	
+    362 	              type: object	
+    363 	              properties:	
+    364 	                orderId:	
+    365 	                  type: integer	
+    366 	      responses:	
+    367 	        '200':	
+    368 	          description: Order deleted successfully	
+    369 	        '500':	
+    370 	          description: Internal server error	
+    371 		
+    372 		
+    373 	  /orderDish/create:	
+    374 	    post:	
+    375 	      summary: Add dishes to an order	
+    376 	      requestBody:	
+    377 	        required: true	
+    378 	        content:	
+    379 	          application/json:	
+    380 	            schema:	
+    381 	              type: array	
+    382 	              items:	
+    383 	                type: object	
+    384 	                properties:	
+    385 	                  orderId:	
+    386 	                    type: integer	
+    387 	                  dishId:	
+    388 	                    type: integer	
+    389 	      responses:	
+    390 	        '201':	
+    391 	          description: Dishes added to order	
+    392 	          content:	
+    393 	            application/json:	
+    394 	              schema:	
+    395 	                $ref: '#/components/schemas/OrderDish'	
+    396 	        '500':	
+    397 	          description: Internal server error	
+    398 		
+    399 	  /orderDish/getAll:	
+    400 	    get:	
+    401 	      summary: Get all order-dishes	
+    402 	      responses:	
+    403 	        '200':	
+    404 	          description: A list of all order-dishes	
+    405 	          content:	
+    406 	            application/json:	
+    407 	              schema:	
+    408 	                type: array	
+    409 	                items:	
+    410 	                  $ref: '#/components/schemas/OrderDish'	
+    411 	        '500':	
+    412 	          description: Internal server error	
+    413 		
+    414 	  /orderDish/getByOrder:	
+    415 	    get:	
+    416 	      summary: Get order-dishes by order ID	
+    417 	      parameters:	
+    418 	        - in: query	
+    419 	          name: orderId	
+    420 	          required: true	
+    421 	          description: The ID of the order to retrieve dishes for	
+    422 	          schema:	
+    423 	            type: integer	
+    424 	      responses:	
+    425 	        '200':	
+    426 	          description: A list of order-dishes for the specified order	
+    427 	          content:	
+    428 	            application/json:	
+    429 	              schema:	
+    430 	                type: array	
+    431 	                items:	
+    432 	                  $ref: '#/components/schemas/OrderDish'	
+    433 	        '404':	
+    434 	          description: Order not found	
+    435 	        '500':	
+    436 	          description: Internal server error	
+    437 	/orderDish/edit/{dishId}/{orderId}:	
+    438 	    post:	
+    439 	      summary: Update an order-dish relationship	
+    440 	      parameters:	
+    441 	        - in: path	
+    442 	          name: dishId	
+    443 	          required: true	
+    444 	          description: The ID of the dish	
+    445 	        - in: path	
+    446 	          name: orderId	
+    447 	          required: true	
+    448 	          description: The ID of the order	
+    449 	      requestBody:	
+    450 	        required: true	
+    451 	        content:	
+    452 	          application/json:	
+    453 	            schema:	
+    454 	              type: object	
+    455 	      responses:	
+    456 	        '200':	
+    457 	          description: Order-dish updated successfully	
+    458 	        '404':	
+    459 	          description: Order-dish not found	
+    460 	        '500':	
+    461 	          description: Internal server error	
+    462 		
+    463 	  /orderDish/delete:	
+    464 	    post:	
+    465 	      summary: Remove a dish from an order	
+    466 	      requestBody:	
+    467 	        required: true	
+    468 	        content:	
+    469 	          application/json:	
+    470 	            schema:	
+    471 	              type: object	
+    472 	              properties:	
+    473 	                orderId:	
+    474 	                  type: integer	
+    475 	                dishId:	
+    476 	                  type: integer	
+    477 	      responses:	
+    478 	        '200':	
+    479 	          description: Dish removed from order	
+    480 	        '500':	
+    481 	          description: Internal server error	
+    482 		
+    483 		
+    484 	  /prediction/dish:	
+    485 	    get:	
+    486 	      summary: Predict dish popularity	
+    487 	      responses:	
+    488 	        '200':	
+    489 	          description: Prediction results	
+    490 	          content:	
+    491 	            application/json:	
+    492 	              schema:	
+    493 	                type: object	
+    494 	                properties:	
+    495 	                  prediction:	
+    496 	                    type: string	
+    497 	                    example: "Dish X is predicted to be popular this week."	
+    498 	        '500':	
+    499 	          description: Internal server error	
+    500 		
+    501 	  /prediction/waiter:	
+    502 	    get:	
+    503 	      summary: Predict the number of waiters needed	
+    504 	      responses:	
+    505 	        '200':	
+    506 	          description: Prediction results	
+    507 	          content:	
+    508 	            application/json:	
+    509 	              schema:	
+    510 	                type: object	
+    511 	                properties:	
+    512 	                  prediction:	
+    513 	                    type: string	
+    514 	                    example: "We predict 10 waiters will be needed this shift."	
+    515 	        '500':	
+    516 	          description: Internal server error	
+    517 		
+    518 		
+    519 	  /button/call:	
+    520 	    post:	
+    521 	      summary: Call for a waiter	
+    522 	      responses:	
+    523 	        '200':	
+    524 	          description: Waiter called successfully	
+    525 	        '500':	
+    526 	          description: Internal server error	
+    527 		
+    528 	  /button/mark:	
+    529 	    post:	
+    530 	      summary: Mark waiter's service	
+    531 	      responses:	
+    532 	        '200':	
+    533 	          description: Updated waiter's efficiency	
+    534 	        '500':	
+    535 	          description: Internal server error	
+    536 		
+    537 	components:	
+    538 	  schemas:	
+    539 	    Restaurant:	
+    540 	      type: object	
+    541 	      properties:	
+    542 	        id:	
+    543 	          type: integer	
+    544 	        name:	
+    545 	          type: string	
+    546 	    Waiter:	
+    547 	      type: object	
+    548 	      properties:	
+    549 	        id:	
+    550 	          type: integer	
+    551 	        name:	
+    552 	          type: string	
+    553 	        lastName:	
+    554 	          type: string	
+    555 	        restaurantId:	
+    556 	          type: integer	
+    557 	        sex:	
+    558 	          type: string	
+    559 	        efficiency:	
+    560 	          type: integer	
+    561 	        activity:	
+    562 	          type: boolean	
+    563 	        password:	
+    564 	          type: string	
+    565 	    Dish:	
+    566 	      type: object	
+    567 	      properties:	
+    568 	        id:	
+    569 	          type: integer	
+    570 	        name:	
+    571 	          type: string	
+    572 	        description:	
+    573 	          type: string	
+    574 	        price:	
+    575 	          type: integer	
+    576 	    Order:	
+    577 	      type: object	
+    578 	      properties:	
+    579 	        id:	
+    580 	          type: integer	
+    581 	        waiterId:	
+    582 	          type: integer	
+    583 	        date:	
+    584 	          type: string	
+    585 	          format: date	
+    586 	    OrderDish:	
+    587 	      type: object	
+    588 	      properties:	
+    589 	        orderId:	
+    590 	          type: integer	
+    591 	        dishId:	
+    592 	          type: integer	
+    593 	        quantity:	
+    594 	          type: integer	
