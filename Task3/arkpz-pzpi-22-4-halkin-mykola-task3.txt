@@ -1,0 +1,332 @@
+
+МІНІСТЕРСТВО ОСВІТИ ТА НАУКИ УКРАЇНИ
+
+ХАРКІВСЬКИЙ НАЦІОНАЛЬНИЙ УНІВЕРСИТЕТ РАДІОЕЛЕКТРОНІКИ
+
+
+Кафедра «Програмної інженерії»
+
+
+ЗВІТ
+з лабораторної роботи №3
+з дисципліни “Аналіз та рефакторінг коду” 
+на тему “Розробка бізнес-логіки та функцій адміністрування серверної частини програмної системи ”
+
+
+
+
+Виконав ст. гр. ПЗПІ-22-4
+Галкін Микола Сергійович
+
+Перевірив:
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+Харків 2024
+Мета
+Потрібно розробити бізнес-логику та функції адміністрування серверної частини  програмної системи.
+
+Хід роботи
+
+В лабораторній роботі було реалізовано наступну бізнес логіку:
+    1. Логіка авторизації адміністратора, офіціантів та IOT пристроїв. Зроблено за допомогою сесій; авторизація пристроїв зроблена через генерування та перевірку коду пристрою.
+    2. Хешування паролів за допомогою бібліотеки bcryptjs (використовується 10 кроків соління).
+    3. Генерація передбачень необхідної кількості офіціантів та популярності страв. Для передбачення страв використовувалась формула експоненційного згладжування, спочатку згладжуються данні в незалежності від дати потім використовується трохи змінена формула де використовуються данні залежні від часу. Для передбачення офіціантів теж використовувалась формула експоненційного згладжування з даними в залежності від дати.
+    4. Відправка нотифікації для мобільного пристрою офіціанту.  Коли сервер обирає офіціанта для обслуговування столика автоматично генерується нотифікація, яку отримує мобільний застосунок офіціанта. 
+    5. Адміністрування системи. Адміністратор може зробити резервну копію бази даних, отримавши файловий шлях збереженого файлу; завдяки чому, адміністратор може відновити базу даних. 
+Також  були створені UML діаграми: UML діаграма діяльності створення резервної копії бази даних, UML діаграма діяльності отримання передбачення популярності страв (Додаток А), UML діаграма взаємодії офіціанта з сервером під час логіну (Додаток Б).
+
+Висновки
+
+В ході лабораторної роботи було створено бізнес-логіку та функції адміністрування. Також були створені UML діаграми діяльності та взаємодії.
+
+Відеозвіт - https://www.youtube.com/watch?v=AAFs9UFsaao 
+ДОДАТОК А
+UML діаграми діяльності
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Рисунок А.1 – UML діаграма діяльності створення резервної копії бази даних
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Рисунок А.2 –  UML діаграма діяльності отримання передбачення популярності страв 
+ДОДАТОК Б
+UML діаграма взаємодії
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Рисунок Б.1 –  UML діаграма взаємодії офіціанта з сервером під час логіну
+ДОДАТОК В
+Приклади коду
+
+Логін офіціанта чи адміністратора
+    1 	const login = async (req, res) => {
+    2 	    const { lastName, name, password } = req.body;
+    3 	
+    4 	    try {
+    5 	        const waiter = await Waiter.findOne({ where: { lastName, name } });
+    6 	        
+    7 	        if (!waiter) {
+    8 	            return res.status(400).json({ message: 'Waiter not found' });
+    9 	        }
+    10 	        const isPassword = await bcrypt.compare(password, waiter.password);
+    11 	        if (!isPassword) {
+    12 	            return res.status(400).json({ message: 'Invalid password' });
+    13 	        }
+    14 	        const isAdmin = name == 'admin' && lastName == 'admin';
+    15 	
+    16 	        req.session.waiter = {
+    17 	            waiterId: waiter.waiterId,
+    18 	            isAdmin: isAdmin
+    19 	        };
+    20 	        return res.status(200).json({ message: 'Login successful', waiter: req.session.waiter });
+    21 	    } catch (error) {
+    22 	        console.error('Login error:', error);
+    23 	        return res.status(500).json({message: error.message});
+    24 	    }
+    25 	};
+
+Перевірка авторизації адміністратора
+    1 	const isAdmin = (req, res, next) => {
+    2 	    if (req.session && req.session.waiter && req.session.waiter.isAdmin) {
+    3 	        return next();
+    4 	    }
+    5 	    return res.status(401).json({ message: 'System administrator only' });
+    6 	};
+
+Передбачення популярності страв
+    1 	const predictDishPopularity = async (req, res) => {
+    2 	    try {
+    3 	        const {days} = req.body; //how long in the future to predict
+    4 	        const alpha = 0.6; //constant for exponential smoothing, 1 -> no smoothing
+    5 	
+    6 	        const data = await OrderDish.findAll({
+    7 	            attributes: ['dishId', 'quantity', 'orderId'],
+    8 	            include: [{model: Order, attributes: ['date']}],
+    9 	            order: [[db.sequelize.col('Order.date'), 'ASC']]
+    10 	        });
+    11 	
+    12 	        let popularityDate = {};
+    13 	        data.forEach(order => {
+    14 	            const dishId = order.dishId;
+    15 	            const quantity = order.quantity;
+    16 	            const orderDate = new Date(order.Order.date).toISOString().split('T')[0];
+    17 	            if (!popularityDate[dishId]) {
+    18 	                popularityDate[dishId] = [];
+    19 	            }
+    20 	            popularityDate[dishId].push({ orderDate, quantity });
+    21 	        });
+    22 	
+    23 	        let popularity = [];
+    24 	
+    25 	        //begin predictions for every dish
+    26 	        for (let dishId in popularityDate) {
+    27 	            const dishData = popularityDate[dishId];
+    28 	            let weeklyAverage = Array(7).fill(0);
+    29 	            let weeklyCount = Array(7).fill(0);
+    30 	
+    31 	            dishData.forEach(data => {
+    32 	                const dayOfWeek = new Date(data.orderDate).getDay();
+    33 	                //get quantity of ordered dish based on day of week
+    34 	                weeklyAverage[dayOfWeek] += data.quantity;
+    35 	                //get count of orders with dish based on day of week
+    36 	                weeklyCount[dayOfWeek]++;
+    37 	            });
+    38 	
+    39 	            //get the average per order based on day of week
+    40 	            weeklyAverage = weeklyAverage.map((total, index) =>
+    41 	                weeklyCount[index] > 0 ? total / weeklyCount[index] : 0
+    42 	            );
+    43 	
+    44 	            //use data for prediction (without date)
+    45 	            let smoothPopularity = 0;
+    46 	            dishData.forEach((data, i) => {
+    47 	                const { quantity } = data;
+    48 	                if (i == 0) {
+    49 	                    smoothPopularity = quantity;
+    50 	                } else {
+    51 	                    //exponential smoothing, used to predict general data (not regarding date)
+    52 	                    smoothPopularity = alpha * quantity + (1 - alpha) * smoothPopularity;
+    53 	                }
+    54 	            });
+    55 	
+    56 	            //use data for prediction (with date)
+    57 	            let predictions = [];
+    58 	            let lastSmooth = smoothPopularity;
+    59 	            for (let i = 1; i <= days; i++) {
+    60 	                const futureDate = new Date(getDate(i)).getDay();
+    61 	                const historicalAverage = weeklyAverage[futureDate] || smoothPopularity;
+    62 	
+    63 	                //modified exponential smoothing, used to predict dated data
+    64 	                lastSmooth = alpha * historicalAverage + (1 - alpha) * lastSmooth;
+    65 	
+    66 	                predictions.push({
+    67 	                    date: futureDate,
+    68 	                    predictedPopularity: lastSmooth
+    69 	                });
+    70 	            }
+    71 	
+    72 	            const dish = await Dish.findByPk(dishId);
+    73 	            popularity.push({
+    74 	                dishId,
+    75 	                name: dish.name,
+    76 	                description: dish.description,
+    77 	                price: dish.price,
+    78 	                smoothPopularity,
+    79 	                predictions
+    80 	            });
+    81 	        }
+    82 	
+    83 	        popularity.sort((a, b) => b.smoothPopularity - a.smoothPopularity);
+    84 	
+    85 	        return res.status(200).json({
+    86 	            message: "success",
+    87 	            data: popularity
+    88 	        });
+    89 	    } catch (error) {
+    90 	        return res.status(500).json({ message: error.message });
+    91 	    }
+    92 	};
+
+Передбачення кількості офіціантів
+
+    1 	const predictAmountOfWaiters = async (req, res) => {
+    2 	    try {
+    3 	        const {days} = req.body; //how long in the future to predict
+    4 	        const alpha = 0.6; //constant for exponential smoothing, 1 -> no smoothing
+    5 	
+    6 	        const ordersData = await Order.findAll({
+    7 	            attributes: ['orderId', 'waiterId', 'date'],
+    8 	            order: [[db.sequelize.col('date'), 'ASC']]
+    9 	        });
+    10 	
+    11 	        let weeklyAverage = Array(7).fill(0);
+    12 	        ordersData.forEach(order => {
+    13 	            const orderDate = (new Date(order.date)).getDay();
+    14 	            //count of orders per day of week
+    15 	            weeklyAverage[orderDate]++;
+    16 	        });
+    17 	
+    18 	        let predictions = [];
+    19 	        for (let i = 1; i <= days; i++) {
+    20 	            const futureDate = (new Date(getDate(i))).getDay();
+    21 	            //exponential smoothing, used to predict data
+    22 	            let predictedWaiters = alpha * weeklyAverage[futureDate] + (1 - alpha) * (weeklyAverage[futureDate]);
+    23 	
+    24 	            predictions.push({
+    25 	                date: futureDate,
+    26 	                predictedWaiters: Math.round(predictedWaiters)
+    27 	            });
+    28 	        }
+    29 	
+    30 	        return res.status(200).json({
+    31 	            message: "success",
+    32 	            data: predictions
+    33 	        });
+    34 	    } catch (error) {
+    35 	        return res.status(500).json({ message: error.message });
+    36 	    }
+    37 	};
+
+Створення резервної копії бази даних
+    1 	const backup = async (req, res) => {
+    2 	    try {
+    3 	        const timestamp = new Date().toISOString();
+    4 	        const backupPath = '/var/opt/mssql/backups/backup_' + timestamp + '.bak';
+    5 	        const query = BACKUP DATABASE ${process.env.DB_NAME} TO DISK = '${backupPath}'WITH INIT;;
+    6 	        await db.sequelize.query(query);
+    7 	
+    8 	        return res.status(200).json({
+    9 	            message: Database backed up,
+    10 	            backupPath,
+    11 	        });
+    12 	    } catch (error) {
+    13 	        return res.status(500).json({ error: error.message });
+    14 	    }
+    15 	};
+
+Відновлення бази даних
+
+    1 	const restore = async (req, res) => {
+    2 	    const { backupFileName } = req.body;
+    3 	    try {
+    4 	        let query = USE master;;
+    5 	        await db.sequelize.query(query);
+    6 	
+    7 	        query = RESTORE DATABASE ${process.env.DB_NAME} FROM DISK = N'${backupFileName}' WITH REPLACE;;
+    8 	        await db.sequelize.query(query);
+    9 	
+    10 	        query = USE ${process.env.DB_NAME};;
+    11 	        await db.sequelize.query(query);
+    12 	        
+    13 	        return res.status(200).json({
+    14 	            message: 'Database restored successfully',
+    15 	        });
+    16 	
+    17 	    } catch (error) {
+    18 	        return res.status(500).json({ error: error.message });
+    19 	    }
+    20 	};
