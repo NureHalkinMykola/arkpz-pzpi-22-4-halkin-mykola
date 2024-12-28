@@ -11,14 +11,12 @@ const predictDishPopularity = async (req, res) => {
         const {days} = req.body; //how long in the future to predict
         const alpha = 0.6; //constant for exponential smoothing, 1 -> no smoothing
 
-        //get needed data
         const data = await OrderDish.findAll({
             attributes: ['dishId', 'quantity', 'orderId'],
             include: [{model: Order, attributes: ['date']}],
             order: [[db.sequelize.col('Order.date'), 'ASC']]
         });
 
-        //put needed data in an object
         let popularityDate = {};
         data.forEach(order => {
             const dishId = order.dishId;
@@ -114,7 +112,6 @@ const predictAmountOfWaiters = async (req, res) => {
         const {days} = req.body; //how long in the future to predict
         const alpha = 0.6; //constant for exponential smoothing, 1 -> no smoothing
 
-        //get needed data
         const ordersData = await Order.findAll({
             attributes: ['orderId', 'waiterId', 'date'],
             order: [[db.sequelize.col('date'), 'ASC']]
@@ -130,7 +127,7 @@ const predictAmountOfWaiters = async (req, res) => {
         let predictions = [];
         for (let i = 1; i <= days; i++) {
             const futureDate = (new Date(getDate(i))).getDay();
-            //exponential smoothing, used to predict general data (not regarding date)
+            //exponential smoothing, used to predict data
             let predictedWaiters = alpha * weeklyAverage[futureDate] + (1 - alpha) * (weeklyAverage[futureDate]);
 
             predictions.push({
